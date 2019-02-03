@@ -1,6 +1,7 @@
-var $       = require('cheerio');
+var $ = require('cheerio');
 var request = require('request');
-var md5     = require('MD5');
+const got = require('got');
+var md5 = require('MD5');
 
 /**
  * @description get the correct sanitized value from html 'tag'
@@ -15,9 +16,14 @@ function getPropValue(tag) {
   } else if ($(tag).attr('itemprop') === 'image' && $(tag).attr('src')) {
     value = $(tag).attr('src');
   } else if ($(tag).attr('itemprop') === 'availability' && $(tag).attr('href')) {
-    value = $(tag).attr('href').split('/')[3]
+    value = $(tag)
+      .attr('href')
+      .split('/')[3];
   } else {
-    value = $(tag).text().replace(/[\n\t\r]+/g, '').replace(/ +(?= )/g, '');
+    value = $(tag)
+      .text()
+      .replace(/[\n\t\r]+/g, '')
+      .replace(/ +(?= )/g, '');
   }
   return value.trim();
 }
@@ -45,11 +51,10 @@ function arraySearch(items, id) {
  */
 function processItemtype(item, processedItems) {
   processedItems.push({
-    'id':         md5($(item).html()),
-    'name':       $(item).attr('itemtype'),
-    'properties': {}
+    id: md5($(item).html()),
+    name: $(item).attr('itemtype'),
+    properties: {},
   });
-
 }
 
 /**
@@ -61,13 +66,15 @@ function processItemtype(item, processedItems) {
 function processItemprop(item, processedItems) {
   var property, value, itemtypeHtml, currentItem;
 
-  itemtypeHtml = $(item).parents("[itemtype]").html();
+  itemtypeHtml = $(item)
+    .parents('[itemtype]')
+    .html();
 
   if (itemtypeHtml) {
     property = $(item).attr('itemprop');
-    value    = getPropValue(item);
+    value = getPropValue(item);
 
-    currentItem   = arraySearch(processedItems, md5(itemtypeHtml));
+    currentItem = arraySearch(processedItems, md5(itemtypeHtml));
 
     if (currentItem.properties[property]) {
       if (!Array.isArray(currentItem.properties[property])) {
@@ -81,6 +88,20 @@ function processItemprop(item, processedItems) {
 }
 
 /**
+ * @description process given itemprop item and puts it into provided collection for processed items
+ *
+ * @param {Object} item cheerio HTML node
+ * @param {Array} processedItems Collection with already processed items
+ */
+function processLDJson(item, processedItems) {
+  processedItems.push({
+    id: md5($(item).html()),
+    name: 'ld',
+    properties: JSON.parse($(item).html()),
+  });
+}
+
+/**
  * @description parse HTML content and return a Object/JSON
  *
  * @param {string} html HTML to parse
@@ -90,15 +111,19 @@ function parse(html) {
   // compatibility with the old signature
   html = arguments[arguments.length - 1];
 
-  var items      = [];
+  var items = [];
   var parsedHTML = $.load(html);
 
-  parsedHTML('[itemtype]').map(function (i, item) {
+  parsedHTML('[itemtype]').map(function(i, item) {
     processItemtype(item, items);
   });
 
-  parsedHTML('[itemprop]').map(function (i, item) {
+  parsedHTML('[itemprop]').map(function(i, item) {
     processItemprop(item, items);
+  });
+
+  parsedHTML('[type="application/ld+json"]').map(function(i, item) {
+    processLDJson(item, items);
   });
 
   return exports.returnJson ? JSON.stringify(items) : items;
@@ -110,24 +135,30 @@ function parse(html) {
  * @param {string} url Url to download
  * @param {function} callback classic node function(error: null|object, result: string|object){} callback
  */
-function parseUrl(url, callback) {
+async function parseUrl(url, callback) {
   var options = {
-    uri:            url,
-    method:         "GET",
-    followRedirect: true
+    uri: url,
+    method: 'GET',
+    followRedirect: true,
   };
 
-  request(options, function (err, res, body) {
-    if (err) {
-      callback(err);
-    } else {
-      callback(null, parse(body));
-    }
-  });
+  try {
+    const { body: html } = await got(url);
+    callback(null, parse(html));
+  } catch (err) {
+    callback(err);
+  }
+  // request(options, function(err, res, body) {
+  //   if (err) {
+  //     callback(err);
+  //   } else {
+  //     callback(null, parse(body));
+  //   }
+  // });
 }
 
-exports.parse      = parse;
-exports.parseUrl   = parseUrl;
+exports.parse = parse;
+exports.parseUrl = parseUrl;
 
 /**
  * @description Flag to switch whether parser returns result as object or stringified JSON
@@ -139,7 +170,7 @@ exports.returnJson = true;
  * @param {boolean} value If true, library will return JSON, if false - Object
  * @returns {Object} library itself
  */
-exports.json       = function (value) {
+exports.json = function(value) {
   exports.returnJson = value;
   return exports;
 };
