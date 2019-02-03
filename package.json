@@ -1,6 +1,6 @@
 {
   "name": "scrape-schema",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Scrape a webpage with given URL, parse and extract microdata (schema.org) and return a JSON.",
   "main": "index.js",
   "directories": {

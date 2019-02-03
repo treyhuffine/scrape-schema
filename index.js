@@ -107,7 +107,7 @@ function processLDJson(item, processedItems) {
  * @param {string} html HTML to parse
  * @returns {object|string} Resulting data object, stringified if microdata.returnJson == true
  */
-function parse(html) {
+function parse(html, options = {}) {
   // compatibility with the old signature
   html = arguments[arguments.length - 1];
 
@@ -126,7 +126,7 @@ function parse(html) {
     processLDJson(item, items);
   });
 
-  return exports.returnJson ? JSON.stringify(items) : items;
+  return options.string ? JSON.stringify(items) : items;
 }
 
 /**
